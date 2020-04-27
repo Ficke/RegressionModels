@@ -9,9 +9,18 @@ sigma(reg)
 
 head(mtcars)
 cars <- lm(mpg ~ wt, data = mtcars)
-newdata <- data.frame(wt = mean(mtcars$wt))
+cars1 <- lm(mpg ~1, data = mtcars)
 
-predict(cars,newdata,interval="confidence")
+rss<-sum(residuals(cars)^2)
+rss1<-sum(residuals(cars1)^2)
 
+rss/rss1
 
+summary(cars)
+summary(cars1)
+newdata <- data.frame(wt = 3)
+
+predict(cars,newdata,interval="prediction")
+
+help(mtcars)
 
