@@ -31,5 +31,24 @@ cf4<-summary(mdl4)$coef
 cf4[1,1]/cf4[2,1]
 
 #question 5
+...
 
+#question 6
+x <- -5:5
+y <- c(5.12, 3.93, 2.67, 1.87, 0.52, 0.08, 0.93, 2.05, 2.54, 3.87, 4.97)
+
+knots<- c(0)
+SplineTerms<-sapply(knots,function(knot) (x>knot)*(x-knot))
+SplineTerms
+xMat<-cbind(1,x,SplineTerms)
+yhat<-predict(lm(y~xMat))
+model<-lm(y~xMat)
+model
+yhat
+plot(x,y)
+lines(x,yhat)
+
+#answer
+coef<-model$coefficients
+coef[3]+coef[4]
 
