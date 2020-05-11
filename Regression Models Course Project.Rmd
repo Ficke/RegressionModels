@@ -5,26 +5,95 @@ date: "5/9/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## Executive Summary 
+
+This paper is interested in addressing the relationship between car transmission type and fuel economy. Specitically, it answers: 
+
+
+* “Is an automatic or manual transmission better for MPG”
+* "Quantify the MPG difference between automatic and manual transmissions"
+
+
+The paper contains 5 sections: 
+
+1. Data Cleaning 
+2. Data exploration 
+3. Variable Reduction
+4. Significance Tests 
+5. Results 
+
+***
+### Data Cleaning 
+
+```{r include=FALSE}
+require(dplyr)
+require(tidyverse)
+require(ggplot2)
+require(corrplot)
+require(RColorBrewer)
+require(PerformanceAnalytics)
+require(GGally)
+require(caret)
+require(AppliedPredictiveModeling)
+require(glmnet)
+require(bestglm)
+require(doParallel)
+
+data("mtcars")
+mtcars.fac <-
+  mtcars %>% mutate_at(c("cyl", "vs", "am", "gear", "carb"), as.factor)
+
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+First we'll read in our data and adjust the data types as needed
+```{r, echo = FALSE}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+as.matrix(sapply(mtcars, class))
+as.matrix(sapply(mtcars.fac, class))
 
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+### Data Exploration
 
-You can also embed plots, for example:
+First we'll examine the response data:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, examine response data 1, echo = FALSE}
+qplot(mpg, data = mtcars, binwidth = 1,main = "Distribution of MPG Data") + 
+    theme(plot.title = element_text(hjust = 0.5))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Next we'll look at the superficial relationship between transmission type and fuel economy:
+```{r, examine response data 2, echo = FALSE}
+P1 <- ggplot(data = mtcars.fac,
+             aes(x = am, y = mpg)) +
+   geom_boxplot() + 
+  ggtitle("Transmission Type vs MPG (0 = automatic, 1 = manual)") + 
+  theme(plot.title = element_text(hjust = 0.5))
+P1
+```
+
+Now we'll examine the corelations in our data. Since there are few predictors, we'll look at all of them: 
+```{r, examine response data, echo = FALSE}
+Cars.Cor <- cor(mtcars)
+corrplot(
+  Cars.Cor,
+  type = "upper",
+  order = "hclust",
+  col = brewer.pal(n = 5, name = "RdYlBu")
+)
+```
+
+
+###  Variable Reduction 
+
+Here we'll go through a series of models to 
+see if the superficial relationship we found 
+in the first step holds
+
+
+
+
+
+
+
