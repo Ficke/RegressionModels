@@ -121,7 +121,7 @@ mdl8 <-
 
 #test to see if cyl or transmission should be included
 anova(mdl8$finalModel, mdl7$finalModel, mdl6$finalModel, test = "Chisq")
-anova(mdl7$finalModel, test = "Chisq")
+anova(mdl8$finalModel, test = "Chisq")
 coef7 <- summary(mdl7)$coef
 coef8 <- summary(mdl8)$coef
 
@@ -148,5 +148,12 @@ resid7 <- ggplot(data = mtcars.fac, aes(x = mpg, y = residuals7)) +
   geom_point() +
   geom_hline(yintercept = mean(residuals7))
 resid7
+
+
+ggplot(mdl7$finalModel) + 
+  geom_point(aes(x=.fitted, y=.resid)) +
+  geom_hline(yintercept = mean(residuals7))
+
+
 
 #residuals seem dispersed, though there does seem to be an upward slope which is concerning

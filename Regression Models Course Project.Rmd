@@ -1,11 +1,13 @@
 ---
 title: "Regression Models Course Project"
 author: "Adam Ficke"
-date: "5/9/2020"
-output: html_document
+date: "5/10/2020"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
-## Executive Summary 
+## Abstract 
 
 This paper is interested in addressing the relationship between car transmission type and fuel economy. Specitically, it answers: 
 
@@ -17,13 +19,17 @@ This paper is interested in addressing the relationship between car transmission
 The paper contains 5 sections: 
 
 1. Data Cleaning 
-2. Data exploration 
+2. Data Exploration 
 3. Variable Reduction
 4. Significance Tests 
 5. Results 
 
+The conclusions of this paper at that these data do not show a significant effect of transmission type on the fuel economy of a vehicle, despite the superficial relationship initially observed. 
+
+
 ***
 ### Data Cleaning 
+
 
 ```{r include=FALSE}
 require(dplyr)
@@ -47,23 +53,34 @@ mtcars.fac <-
 
 
 First we'll read in our data and adjust the data types as needed
-```{r, echo = FALSE}
+
+
+```{r, echo = FALSE, include = FALSE}
 
 as.matrix(sapply(mtcars, class))
 as.matrix(sapply(mtcars.fac, class))
 
 ```
 
+
+***
 ### Data Exploration
 
-First we'll examine the response data:
+We then examine the shape of the response data:
+
 
 ```{r, examine response data 1, echo = FALSE}
 qplot(mpg, data = mtcars, binwidth = 1,main = "Distribution of MPG Data") + 
     theme(plot.title = element_text(hjust = 0.5))
 ```
 
+
+We can see that the data are all positive, but aren't counts (they can be fractions). For that reason we'll use a Gamma distribution in our link function. 
+
+
 Next we'll look at the superficial relationship between transmission type and fuel economy:
+
+
 ```{r, examine response data 2, echo = FALSE}
 P1 <- ggplot(data = mtcars.fac,
              aes(x = am, y = mpg)) +
@@ -73,7 +90,13 @@ P1 <- ggplot(data = mtcars.fac,
 P1
 ```
 
+
+We can see on average manual transmission cars have higher fuel economy. 
+
+
 Now we'll examine the corelations in our data. Since there are few predictors, we'll look at all of them: 
+
+
 ```{r, examine response data, echo = FALSE}
 Cars.Cor <- cor(mtcars)
 corrplot(
@@ -89,11 +112,128 @@ corrplot(
 
 Here we'll go through a series of models to 
 see if the superficial relationship we found 
-in the first step holds
+in the first step holds when we control for the other variables. To start, we'll use
+all of the variables, and trim them down later. 
 
 
+``` {r model 1, message=FALSE}
+
+mdl1 <- glm(mpg ~ ., family = Gamma, data = mtcars.fac)
+summary(mdl1)
+``` 
 
 
+clearly this model is overfit - none of the variables show as significant, and we can see from the prior correlation exhibit that there's some colinearity going on 
 
 
+We'll next use resampling to reduce our predictors. The data are relatively thin and we aren't resource limited, so we'll use cross validation to prevent overfitting. 
 
+```{r resample, message=FALSE}
+cl <- makePSOCKcluster(16)
+registerDoParallel(cl)
+set.seed(100)
+
+subsets <- c(1:11)
+
+ctrl <- rfeControl(
+  functions = rfFuncs,
+  method = "repeatedcv",
+  repeats = 10,
+  verbose = FALSE
+)
+
+lmProfile <- rfe(
+  x = mtcars.fac[, 2:11],
+  y = mtcars.fac$mpg,
+  sizes = subsets,
+  rfeControl = ctrl,
+)
+lmProfile
+
+```
+
+
+We see that disp, wt, hp, and cyl were chosen by the recursive feature elimination. This doesn't bode well for the variable of interest, transmission type, but we'll keep that in the model to see if it shows significance. 
+
+
+``` {r model 6, message=FALSE}
+ctrl <- trainControl(method = "cv", number = 10)
+mdl6 <-
+  train(
+    mpg ~ am +  disp + wt + hp + cyl,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+coef6 <- summary(mdl6)$coef
+exp(coef6)
+```
+
+
+Next we'll produce two other nested models so we can test the incremental significance of removing several of the categorical variables. This incldues our variable of interest.
+
+
+``` {r models 7 & 8, message=FALSE}
+
+#model 7 - try without cyl
+
+mdl7 <-
+  train(
+    mpg ~ am +  disp + wt + hp,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+#try without transmission 
+mdl8 <-
+  train(
+    mpg ~ +disp + wt + hp,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+#test to see if cyl or transmission should be included
+anova(mdl8$finalModel, mdl7$finalModel, mdl6$finalModel, test = "Chisq")
+```
+
+
+### Results 
+
+
+From the final Anova test, we can see that the significant model predictors end up being weight, displacement, and horsepower, but not transmission type. 
+
+Though transmission type doesn't seem to drive fuel economy, we'll still go back to the model with transmission type included, to obtain a confidence interval for its postential impact. First we'll check the residuals first for that final model to check our assumptions: 
+
+
+```{r residuals, message=FALSE}
+residuals7<-residuals(mdl7$finalModel)
+resid7<-ggplot(mdl7$finalModel) + 
+  geom_point(aes(x=.fitted, y=.resid)) +
+  geom_hline(yintercept = mean(residuals7))
+resid7
+```
+
+
+The residuals are well dispersed - we'll geep the Gamma distribution. 
+
+Now we'll look at the confidence intervals for the final model which incldues transmission type (am): 
+
+
+```{r final model with am included, message=FALSE}
+
+coef7 <- summary(mdl7)$coef
+exp(coef7)
+exp(confint(mdl7$finalModel))
+```
+
+
+You can see from the confidence interval that the multiplicative effect of a car having an automatic transmission relative to manual (am1) is 0.0133% - which is small. When you look at the confidence intervals that coefficient falls on either side of 1, which shows that within the CI we aren't sure which direction the effect is. For that reason, these data do not show a significant effect of transmission type on the fuel economy of a vehicle, despite the superficial relationship observed. 
