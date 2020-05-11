@@ -1,0 +1,222 @@
+---
+title: "Regression Course Project"
+author: "Adam Ficke"
+date: "5/11/2020"
+output: 
+  pdf_document: 
+    fig_caption: yes
+    fig_height: 2
+    includes:  
+      in_header: my_header.tex
+---
+```{r include=FALSE}
+require(dplyr)
+require(tidyverse)
+require(ggplot2)
+require(corrplot)
+require(RColorBrewer)
+require(PerformanceAnalytics)
+require(GGally)
+require(caret)
+require(AppliedPredictiveModeling)
+require(glmnet)
+require(bestglm)
+require(doParallel)
+
+data("mtcars")
+mtcars.fac <-
+  mtcars %>% mutate_at(c("cyl", "vs", "am", "gear", "carb"), as.factor)
+
+as.matrix(sapply(mtcars, class))
+as.matrix(sapply(mtcars.fac, class))
+```
+
+## Abstract 
+
+This paper is interested in addressing the relationship between car transmission type and fuel economy. Specifically, it answers: 
+
+* “Is an automatic or manual transmission better for MPG”
+* "Quantify the MPG difference between automatic and manual transmissions"
+
+The conclusions of this paper at that these data do not show a significant effect of transmission type on the fuel economy of a vehicle, despite the superficial relationship initially observed. 
+
+### Data Exploration
+
+First examine the shape of the response data (fig. 1) We can see that the data are all positive, but aren't counts (they can be fractions). For that reason we'll use a Gamma distribution in our link function. 
+
+Next we'll look at the superficial relationship between transmission type and fuel economy. (fig. 2) We can see on average manual transmission cars have higher fuel economy. 
+
+### Modeling
+
+Here we'll go through a series of models to see if the superficial relationship we found in the first step holds when we control for the other variables. To start, we'll use all of the variables, and trim them down later. (Model 1)
+
+Clearly this model is overfit - none of the variables show as significant, and we can see from the correlation exhibit (fig. 3) that there's some collinearity going on. 
+
+We'll next use resampling to reduce our predictors. The data are relatively thin and we aren't resource limited, so we'll use cross validation to prevent overfitting. (Table 1)
+
+We see that disp, wt, hp, and cyl were chosen by the recursive feature elimination. This doesn't bode well for the variable of interest, transmission type, but we'll keep that in the model to see if it shows significance. 
+
+We'll produce nested models so we can test the incremental significance of removing several of the categorical variables. (Models 2,3,& 4) 
+
+From the final Anova test, we can see that the significant model predictors end up being weight, displacement, and horsepower, but not transmission type. 
+
+Though transmission type doesn't seem to drive fuel economy, we'll still go back to the model with transmission type included, to obtain a confidence interval for its potential impact. First we'll check the residuals first for that final model to check our assumptions (fig. 4)
+
+The residuals are well dispersed - we'll keep the Gamma distribution. 
+
+Now we'll look at the confidence intervals for the final model which includes transmission type (am) (Model 4)
+
+### Results
+
+
+You can see from the confidence interval that the multiplicative effect of a car having an automatic transmission relative to manual (am1) is 0.0133% - which is small. When you look at the confidence intervals that coefficient falls on either side of 1, which shows that within the CI we aren't sure which direction the effect is. For that reason, these data do not show a significant effect of transmission type on the fuel economy of a vehicle, despite the superficial relationship observed. 
+
+## Appendix 
+
+```{r echo=FALSE, fig.cap="Response Distribution"}
+qplot(mpg, data = mtcars, binwidth = 1,main = "Distribution of MPG Data") + 
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r echo=FALSE, fig.cap="Transmission Boxplot"}
+P1 <- ggplot(data = mtcars.fac,
+             aes(x = am, y = mpg)) +
+   geom_boxplot() + 
+  ggtitle("Transmission Type vs MPG (0 = automatic, 1 = manual)") + 
+  theme(plot.title = element_text(hjust = 0.5))
+P1
+```
+
+
+
+```{r fig3a - Correlations, echo=FALSE, fig.cap="Correlation Matrix"}
+Cars.Cor <- cor(mtcars)
+corrplot(
+  Cars.Cor,
+  type = "upper",
+  order = "hclust",
+  col = brewer.pal(n = 5, name = "RdYlBu")
+)
+```
+
+
+***
+
+
+```{r model 1, echo=FALSE}
+
+mdl1 <- glm(mpg ~ ., family = Gamma, data = mtcars.fac)
+exp(summary(mdl1)$coef)
+``` 
+
+Model 1: All Variables 
+
+
+***
+
+
+```{r resample}
+cl <- makePSOCKcluster(16)
+registerDoParallel(cl)
+set.seed(100)
+
+subsets <- c(1:11)
+
+ctrl <- rfeControl(
+  functions = rfFuncs,
+  method = "repeatedcv",
+  repeats = 5,
+  verbose = FALSE
+)
+
+lmProfile <- rfe(
+  x = mtcars.fac[, 2:11],
+  y = mtcars.fac$mpg,
+  sizes = subsets,
+  rfeControl = ctrl,
+)
+lmProfile
+
+```
+
+Table 1: Resampled Variable Reduction
+
+
+***
+
+
+```{r Model 6, echo=FALSE}
+ctrl <- trainControl(method = "cv", number = 5)
+mdl6 <-
+  train(
+    mpg ~ am +  disp + wt + hp + cyl,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+coef6 <- summary(mdl6)$coef
+exp(coef6)
+```
+
+Model 2: Reduced Variables
+
+
+***
+
+
+``` {r models 7 & 8, message=FALSE, echo=FALSE}
+
+#model 7 - try without cyl
+
+mdl7 <-
+  train(
+    mpg ~ am +  disp + wt + hp,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+#try without transmission 
+mdl8 <-
+  train(
+    mpg ~ disp + wt + hp,
+    family = Gamma,
+    method = "glm",
+    data = mtcars.fac,
+    trControl = ctrl,
+    metric =  "Rsquared"
+  )
+
+#test to see if cyl or transmission should be included
+anova(mdl8$finalModel, mdl7$finalModel, mdl6$finalModel, test = "Chisq")
+```
+
+Models 3 & 4: Testing for Significance of Categorical Variables
+
+
+***
+
+
+```{r residuals, message=FALSE, echo=FALSE, fig.cap="Residual Plot"}
+residuals7<-residuals(mdl7$finalModel)
+resid7<-ggplot(mdl7$finalModel) + 
+  geom_point(aes(x=.fitted, y=.resid)) +
+  geom_hline(yintercept = mean(residuals7))
+resid7
+```
+
+
+
+```{r final model with am included, echo=FALSE, message=FALSE}
+coef7<-coef(mdl7$finalModel)
+exp(coef7)
+exp(confint(mdl7$finalModel))
+```
+
+Model 4: Coefficients and Confidence Intervals
