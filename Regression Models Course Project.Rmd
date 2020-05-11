@@ -11,10 +11,8 @@ output:
 
 This paper is interested in addressing the relationship between car transmission type and fuel economy. Specitically, it answers: 
 
-
 * “Is an automatic or manual transmission better for MPG”
 * "Quantify the MPG difference between automatic and manual transmissions"
-
 
 The paper contains 5 sections: 
 
@@ -66,10 +64,10 @@ as.matrix(sapply(mtcars.fac, class))
 ***
 ### Data Exploration
 
-We then examine the shape of the response data:
+We then examine the shape of the response data (see fig. 1)
 
 
-```{r, examine response data 1, echo = FALSE}
+```{r figure 1a - response distribution, message=FALSE, warning=FALSE, examine response data 1, echo=, include=FALSE}
 qplot(mpg, data = mtcars, binwidth = 1,main = "Distribution of MPG Data") + 
     theme(plot.title = element_text(hjust = 0.5))
 ```
@@ -78,10 +76,11 @@ qplot(mpg, data = mtcars, binwidth = 1,main = "Distribution of MPG Data") +
 We can see that the data are all positive, but aren't counts (they can be fractions). For that reason we'll use a Gamma distribution in our link function. 
 
 
-Next we'll look at the superficial relationship between transmission type and fuel economy:
+Next we'll look at the superficial relationship between transmission type and fuel economy. (fig. 2) 
 
+We can see on average manual transmission cars have higher fuel economy. 
 
-```{r, examine response data 2, echo = FALSE}
+```{r figure 2a - boxplot , examine response data 2, echo=, include=FALSE}
 P1 <- ggplot(data = mtcars.fac,
              aes(x = am, y = mpg)) +
    geom_boxplot() + 
@@ -91,13 +90,7 @@ P1
 ```
 
 
-We can see on average manual transmission cars have higher fuel economy. 
-
-
-Now we'll examine the corelations in our data. Since there are few predictors, we'll look at all of them: 
-
-
-```{r, examine response data, echo = FALSE}
+```{r fig3a - Correlations, echo=, include=FALSE}
 Cars.Cor <- cor(mtcars)
 corrplot(
   Cars.Cor,
